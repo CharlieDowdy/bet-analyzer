@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bet Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+        th { background-color: #f0f0f0; }
+        .high-rating { background-color: #c8f7c5; }
+        .medium-rating { background-color: #fff7c5; }
+        .low-rating { background-color: #f7c5c5; }
+    </style>
+</head>
+<body>
+    <h1>Bet Analyzer</h1>
+    <p>This table shows live-style betting odds.</p>
+
+    <table id="betsTable">
+        <tr>
+            <th>Bet</th>
+            <th>Odds</th>
+            <th>Probability %</th>
+            <th>EV</th>
+            <th>ROI %</th>
+            <th>Risk %</th>
+            <th>Rating /10</th>
+        </tr>
+    </table>
+
+    <script>
+        const bets = [];
+
+        // Simple rating calculator
+        function calculateRating(ev, roi, risk) {
+            let score = (ev*3 + roi*0.1 - risk*0.1);
+            if (score < 0) score = 0;
+            if (score > 10) score = 10;
+            return score.toFixed(1);
+        }
+
+        // Function to render table
+        function renderTable() {
+            const table = document.getElementById('betsTable');
+            table.innerHTML = `
+                <tr>
+                    <th>Bet</th>
+                    <th>Odds</th>
+                    <th>Probability %</th>
+                    <th>EV</th>
+                    <th>ROI %</th>
+                    <th>Risk %</th>
+                    <th>Rating /10</th>
+                </tr>
+            `;
+
+            bets.forEach(bet => {
+                const row = table.insertRow();
+                row.insertCell(0).innerText = bet.name;
+                row.insertCell(1).innerText = bet.odds;
+                row.insertCell(2).innerText = bet.prob;
+                row.insertCell(3).innerText = bet.ev;
+                row.insertCell(4).innerText = bet.roi;
+                row.insertCell(5).innerText = bet.risk;
+                const ratingCell = row.insertCell(6);
+                ratingCell.innerText = bet.rating;
+
+                if (bet.rating >= 7) ratingCell.className = "high-rating";
+                else if (bet.rating >= 4) ratingCell.className = "medium-rating";
+                else ratingCell.className = "low-rating";
+            });
+        }
+
+        // --- MOCK DATA (for testing before API) ---
+        const sampleData = [
+            {name: "Team A vs Team B", odds: 2.0, prob: 50},
+            {name: "Team C vs Team D", odds: 1.8, prob: 60},
+            {name: "Team E vs Team F", odds: 3.0, prob: 30}
+        ];
+
+        sampleData.forEach(match => {
+            const ev = (match.odds * (match.prob/100) - 1).toFixed(2);
+            const roi = ((match.odds - 1) * (match.prob/100) * 100).toFixed(1);
+            const risk = ((1 - match.prob/100) * 100).toFixed(1);
+            const rating = calculateRating(ev, roi, risk);
+
+            bets.push({
+                name: match.name,
+                odds: match.odds,
+                prob: match.prob,
+                ev,
+                roi,
+                risk,
+                rating
+            });
+        });
+
+        renderTable();
+    </script>
+</body>
+</html>
