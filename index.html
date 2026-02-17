@@ -1,103 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Bet Analyzer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
-        th { background-color: #f0f0f0; }
-        .high-rating { background-color: #c8f7c5; }
-        .medium-rating { background-color: #fff7c5; }
-        .low-rating { background-color: #f7c5c5; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Live Bet Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    .high-rating { background: #c8f7c5; }
+    .medium-rating { background: #fff7c5; }
+    .low-rating { background: #f7c5c5; }
+  </style>
 </head>
 <body>
-    <h1>Bet Analyzer</h1>
-    <p>This table shows live-style betting odds.</p>
+  <h1>Live Bet Analyzer</h1>
+  <p>Loading matches…</p>
+  <table id="betsTable">
+    <tr>
+      <th>Match</th><th>Odds</th><th>Prob %</th><th>EV</th><th>ROI %</th><th>Risk %</th><th>Rating</th>
+    </tr>
+  </table>
 
-    <table id="betsTable">
-        <tr>
-            <th>Bet</th>
-            <th>Odds</th>
-            <th>Probability %</th>
-            <th>EV</th>
-            <th>ROI %</th>
-            <th>Risk %</th>
-            <th>Rating /10</th>
-        </tr>
-    </table>
+<script>
+const PROXY_URL = "https://worker1.charliegdowd.workers.dev/"; // 👈 replace this
 
-    <script>
-        const bets = [];
+// basic rating
+function score(ev, roi, risk) {
+  let s = ev*3 + roi*0.1 - risk*0.1;
+  if (s < 0) s = 0;
+  if (s > 10) s = 10;
+  return s.toFixed(1);
+}
 
-        // Simple rating calculator
-        function calculateRating(ev, roi, risk) {
-            let score = (ev*3 + roi*0.1 - risk*0.1);
-            if (score < 0) score = 0;
-            if (score > 10) score = 10;
-            return score.toFixed(1);
+function renderTable(bets) {
+  const tbl = document.getElementById("betsTable");
+  bets.forEach(b => {
+    const row = tbl.insertRow();
+    row.insertCell(0).innerText = b.name;
+    row.insertCell(1).innerText = b.odds;
+    row.insertCell(2).innerText = b.prob;
+    row.insertCell(3).innerText = b.ev;
+    row.insertCell(4).innerText = b.roi;
+    row.insertCell(5).innerText = b.risk;
+    const cell = row.insertCell(6);
+    cell.innerText = b.rating;
+    if (b.rating >= 7) cell.className = "high-rating";
+    else if (b.rating >= 4) cell.className = "medium-rating";
+    else cell.className = "low-rating";
+  });
+}
+
+// fetch live fixtures
+fetch(`${PROXY_URL}/v3/football/fixtures?date=2026-02-17`)
+  .then(r => r.json())
+  .then(data => {
+    const bets = [];
+    if (data.response && Array.isArray(data.response)) {
+      data.response.forEach(match => {
+        const home = match.teams?.home?.name;
+        const away = match.teams?.away?.name;
+        const name = `${home} vs ${away}`;
+
+        // pull odds if available
+        let odds = 2.0;
+        if (match.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price) {
+          odds = parseFloat(match.bookmakers[0].markets[0].outcomes[0].price);
         }
+        const prob = ((1/odds) * 100).toFixed(1); 
+        const ev = (odds * (prob/100) - 1).toFixed(2);
+        const roi = ((odds - 1) * (prob/100) * 100).toFixed(1);
+        const risk = ((1 - (prob/100)) * 100).toFixed(1);
+        const rating = score(ev,roi,risk);
 
-        // Function to render table
-        function renderTable() {
-            const table = document.getElementById('betsTable');
-            table.innerHTML = `
-                <tr>
-                    <th>Bet</th>
-                    <th>Odds</th>
-                    <th>Probability %</th>
-                    <th>EV</th>
-                    <th>ROI %</th>
-                    <th>Risk %</th>
-                    <th>Rating /10</th>
-                </tr>
-            `;
+        bets.push({ name, odds, prob, ev, roi, risk, rating });
+      });
+    }
+    renderTable(bets);
+  })
+  .catch(err => console.error("Fetch error:", err));
+</script>
 
-            bets.forEach(bet => {
-                const row = table.insertRow();
-                row.insertCell(0).innerText = bet.name;
-                row.insertCell(1).innerText = bet.odds;
-                row.insertCell(2).innerText = bet.prob;
-                row.insertCell(3).innerText = bet.ev;
-                row.insertCell(4).innerText = bet.roi;
-                row.insertCell(5).innerText = bet.risk;
-                const ratingCell = row.insertCell(6);
-                ratingCell.innerText = bet.rating;
-
-                if (bet.rating >= 7) ratingCell.className = "high-rating";
-                else if (bet.rating >= 4) ratingCell.className = "medium-rating";
-                else ratingCell.className = "low-rating";
-            });
-        }
-
-        // --- MOCK DATA (for testing before API) ---
-        const sampleData = [
-            {name: "Team A vs Team B", odds: 2.0, prob: 50},
-            {name: "Team C vs Team D", odds: 1.8, prob: 60},
-            {name: "Team E vs Team F", odds: 3.0, prob: 30}
-        ];
-
-        sampleData.forEach(match => {
-            const ev = (match.odds * (match.prob/100) - 1).toFixed(2);
-            const roi = ((match.odds - 1) * (match.prob/100) * 100).toFixed(1);
-            const risk = ((1 - match.prob/100) * 100).toFixed(1);
-            const rating = calculateRating(ev, roi, risk);
-
-            bets.push({
-                name: match.name,
-                odds: match.odds,
-                prob: match.prob,
-                ev,
-                roi,
-                risk,
-                rating
-            });
-        });
-
-        renderTable();
-    </script>
 </body>
 </html>
